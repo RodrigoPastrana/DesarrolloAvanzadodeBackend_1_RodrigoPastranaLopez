@@ -1,0 +1,15 @@
+[
+  {
+    "id": 1,
+    "title": "Mouse",
+    "description": "Mouse gamer",
+    "code": "MOU-001",
+    "price": 19999,
+    "status": true,
+    "stock": 50,
+    "category": "perifericos",
+    "thumbnails": [
+      "/imgs/mouse1.png"
+    ]
+  }
+]
