@@ -15,7 +15,6 @@ export default class ProductManager {
   static async create(data) {
     const all = await this.getAll();
 
-    // Validaciones mínimas
     const required = ['title','description','code','price','status','stock','category'];
     for (const f of required) {
       if (data[f] === undefined) {
@@ -25,14 +24,12 @@ export default class ProductManager {
       }
     }
 
-    // code único
     if (all.some(p => p.code === data.code)) {
       const e = new Error(`El code "${data.code}" ya existe`);
       e.status = 409;
       throw e;
     }
 
-    // Autoincremental simple
     const nextId = all.length ? (Math.max(...all.map(p => Number(p.id) || 0)) + 1) : 1;
 
     const product = {
@@ -66,7 +63,6 @@ export default class ProductManager {
       throw e;
     }
 
-    // No permitir duplicar code al actualizar
     if ('code' in updates) {
       const dup = all.find(p => p.code === updates.code && String(p.id) !== String(id));
       if (dup) {

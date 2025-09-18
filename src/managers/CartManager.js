@@ -41,7 +41,6 @@ export default class CartManager {
       throw e;
     }
 
-    // Validar existencia del producto
     const product = await ProductManager.getById(pid);
     if (!product) {
       const e = new Error('Producto no existe');
