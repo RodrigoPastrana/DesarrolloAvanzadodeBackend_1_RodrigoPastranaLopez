@@ -1,0 +1,113 @@
+<section>
+  <p class="muted">Esta vista se actualiza automáticamente cuando se crean o eliminan productos.</p>
+
+  <h2>Crear producto</h2>
+  <form id="createForm">
+    <input name="title" placeholder="Título" required />
+    <input name="description" placeholder="Descripción" required />
+    <input name="code" placeholder="Code único" required />
+    <input name="price" type="number" placeholder="Precio" required />
+    <select name="status">
+      <option value="true" selected>Activo</option>
+      <option value="false">Inactivo</option>
+    </select>
+    <input name="stock" type="number" placeholder="Stock" required />
+    <input name="category" placeholder="Categoría" required />
+    <input name="thumbnails" placeholder="Thumbnails (separadas por coma)" />
+    <button type="submit">Crear</button>
+  </form>
+
+  <h2>Eliminar producto</h2>
+  <form id="deleteForm">
+    <input name="id" type="number" placeholder="ID del producto a eliminar" required />
+    <button type="submit" class="secondary">Eliminar</button>
+  </form>
+
+  <h2>Lista de productos</h2>
+  {{> productsList}}
+</section>
+
+<!-- Toast minimalista -->
+<style>
+  #toast {
+    position: fixed; right: 16px; bottom: 16px;
+    padding: 10px 14px; border-radius: 10px; color: #fff;
+    background: #111827; opacity: 0; transform: translateY(12px);
+    transition: all .25s ease; pointer-events: none; z-index: 9999;
+    box-shadow: 0 6px 18px rgba(0,0,0,.18);
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.success { background: #16a34a; }
+  #toast.error { background: #dc2626; }
+  #toast.info { background: #2563eb; }
+</style>
+<div id="toast"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  // -------- Toast helpers --------
+  const toastEl = document.getElementById('toast');
+  let toastTimer;
+  function showToast(msg, type='info', ms=1800) {
+    toastEl.textContent = msg;
+    toastEl.className = ''; // reset
+    toastEl.classList.add(type, 'show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
+  }
+
+  // -------- Socket --------
+  const socket = io();
+  socket.on('errorMessage', (msg) => showToast(msg, 'error', 2600));
+
+  // Evitar "lista actualizada" en la primera carga
+  let firstUpdateDone = false;
+
+  const grid = document.getElementById('productsGrid');
+  function renderProducts(products) {
+    grid.innerHTML = products.map(p => `
+      <div class="card" data-id="${p.id}">
+        <h3 style="margin:0 0 6px 0;">${p.title}</h3>
+        <div class="muted">${p.description ?? ''}</div>
+        <div><strong>Precio:</strong> $${p.price}</div>
+        <div><strong>Stock:</strong> ${p.stock}</div>
+        <div><strong>Code:</strong> <code>${p.code}</code></div>
+        <div><strong>Categoría:</strong> ${p.category}</div>
+        ${Array.isArray(p.thumbnails) && p.thumbnails.length ? `<div class="muted" style="margin-top:6px;">Imgs: ${p.thumbnails.length}</div>` : ``}
+      </div>
+    `).join('');
+    if (firstUpdateDone) showToast('Lista actualizada', 'success');
+    firstUpdateDone = true;
+  }
+  socket.on('productsUpdated', renderProducts);
+
+  // -------- Forms --------
+  const createForm = document.getElementById('createForm');
+  createForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(createForm);
+    const payload = {
+      title: fd.get('title')?.trim(),
+      description: fd.get('description')?.trim(),
+      code: fd.get('code')?.trim(),
+      price: Number(fd.get('price')),
+      status: fd.get('status') === 'true',
+      stock: Number(fd.get('stock')),
+      category: fd.get('category')?.trim(),
+      thumbnails: (fd.get('thumbnails') || '').split(',').map(s => s.trim()).filter(Boolean)
+    };
+    showToast('Creando producto…', 'info', 1200);
+    socket.emit('createProduct', payload);
+    createForm.reset();
+  });
+
+  const deleteForm = document.getElementById('deleteForm');
+  deleteForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = Number(new FormData(deleteForm).get('id'));
+    if (!Number.isFinite(id)) return showToast('ID inválido', 'error');
+    showToast('Eliminando…', 'info', 1200);
+    socket.emit('deleteProduct', id);
+    deleteForm.reset();
+  });
+</script>

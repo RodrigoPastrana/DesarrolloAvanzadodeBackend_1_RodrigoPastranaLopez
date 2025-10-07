@@ -1,0 +1,15 @@
+<div class="grid" id="productsGrid">
+  {{#each products}}
+    <div class="card" data-id="{{this.id}}">
+      <h3 style="margin:0 0 6px 0;">{{this.title}}</h3>
+      <div class="muted">{{this.description}}</div>
+      <div><strong>Precio:</strong> ${{this.price}}</div>
+      <div><strong>Stock:</strong> {{this.stock}}</div>
+      <div><strong>Code:</strong> <code>{{this.code}}</code></div>
+      <div><strong>Categoría:</strong> {{this.category}}</div>
+      {{#if this.thumbnails.length}}
+        <div class="muted" style="margin-top:6px;">Imgs: {{this.thumbnails.length}}</div>
+      {{/if}}
+    </div>
+  {{/each}}
+</div>

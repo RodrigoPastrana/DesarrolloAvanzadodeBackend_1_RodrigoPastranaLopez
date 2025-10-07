@@ -24,14 +24,27 @@ router.get('/:pid', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const created = await ProductManager.create(req.body);
+
+    // Emitir a clientes (para que /realtimeproducts se actualice también con HTTP)
+    try {
+      const io = req.app.get('io');
+      io.emit('productsUpdated', await ProductManager.getAll());
+    } catch (e) { /* noop */ }
+
     res.status(201).json({ status: 'success', payload: created });
   } catch (err) { next(err); }
 });
 
-// PUT /api/products/:pid
+// PUT /api/products/:pid  (opcional: emitir también si querés reflejar updates)
 router.put('/:pid', async (req, res, next) => {
   try {
     const updated = await ProductManager.update(req.params.pid, req.body);
+
+    try {
+      const io = req.app.get('io');
+      io.emit('productsUpdated', await ProductManager.getAll());
+    } catch (e) { /* noop */ }
+
     res.json({ status: 'success', payload: updated });
   } catch (err) { next(err); }
 });
@@ -40,6 +53,12 @@ router.put('/:pid', async (req, res, next) => {
 router.delete('/:pid', async (req, res, next) => {
   try {
     const removed = await ProductManager.delete(req.params.pid);
+
+    try {
+      const io = req.app.get('io');
+      io.emit('productsUpdated', await ProductManager.getAll());
+    } catch (e) { /* noop */ }
+
     res.json({ status: 'success', payload: removed });
   } catch (err) { next(err); }
 });

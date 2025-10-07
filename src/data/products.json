@@ -76,5 +76,19 @@
     "thumbnails": [
       "/imgs/silla1.png"
     ]
+  },
+  {
+    "id": 7,
+    "title": "Micrófono HyperX QuadCast",
+    "description": "Micrófono condensador USB con iluminación RGB y soporte antivibración.",
+    "code": "MIC-001",
+    "price": 80000,
+    "status": true,
+    "stock": 10,
+    "category": "audio",
+    "thumbnails": [
+      "/imgs/mic1.png",
+      "/imgs/mic2.png"
+    ]
   }
 ]
