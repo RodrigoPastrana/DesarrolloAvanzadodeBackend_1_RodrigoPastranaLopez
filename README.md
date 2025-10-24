@@ -8,8 +8,11 @@ Proyecto Full Stack que implementa un eCommerce básico con vistas renderizadas,
 - Navegador compatible con ES6
 
 ## ⚙️ Variables de entorno
-Crea un archivo `.env` (basate en `.env.example`):
+Crea un archivo `.env` 
+(basate en `.env.example`):
+
 MONGO_URI=mongodb+srv://<usuario>:<contraseña>@<cluster>/<nombre_db>?retryWrites=true&w=majority
+
 PORT=8080
 
 ## 🚀 Instalación y ejecución
@@ -18,14 +21,14 @@ npm run dev
 Luego abrí http://localhost:8080
 
 ## 📚 Endpoints principales
-# Productos
+### Productos
 GET /api/products?limit=&page=&sort=&query=
 GET /api/products/:pid
 POST /api/products
 PUT /api/products/:pid
 DELETE /api/products/:pid
 
-# Carritos
+### Carritos
 POST /api/carts
 GET /api/carts/:cid
 POST /api/carts/:cid/product/:pid
