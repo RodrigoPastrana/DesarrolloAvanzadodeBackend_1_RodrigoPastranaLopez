@@ -1,0 +1,95 @@
+<section>
+  
+
+  <form id="filterForm" class="card" style="padding:12px; margin-bottom:16px;">
+    <div style="display:grid; gap:12px;">
+      <input
+        name="query"
+        placeholder="Buscar por categoría o disponibilidad (p. ej. 'audio' o 'status:true')"
+        value="{{query}}"
+      />
+      <select name="sort">
+        <option value="">Sin orden</option>
+        <option value="asc"  {{#if (eq sort "asc")}}selected{{/if}}>Precio ascendente</option>
+        <option value="desc" {{#if (eq sort "desc")}}selected{{/if}}>Precio descendente</option>
+      </select>
+      <div style="display:flex; gap:10px;">
+        <button type="submit" class="btn btn-primary">Aplicar</button>
+        <a class="btn btn-danger btn-outline" href="/products">Limpiar</a>
+      </div>
+    </div>
+  </form>
+
+  <div class="grid">
+    {{#each products}}
+      <div class="card" data-id="{{this._id}}">
+        {{#if this.thumbnails.length}}
+          <img class="img" src="{{this.thumbnails.[0]}}" alt="{{this.title}}">
+        {{/if}}
+        <h3 style="margin:10px 0 6px 0;"><a href="/products/{{this._id}}">{{this.title}}</a></h3>
+        <div class="muted">{{this.description}}</div>
+        <div><strong>Precio:</strong> ${{this.price}}</div>
+        <div><strong>Stock:</strong> {{this.stock}}</div>
+        <div><strong>Categoría:</strong> {{this.category}}</div>
+        <div style="margin-top:10px;">
+          <button class="btn btn-success btn-cart" data-id="{{this._id}}">Agregar al carrito</button>
+        </div>
+      </div>
+    {{/each}}
+  </div>
+
+  <footer style="margin-top:20px;">
+    <p>Página {{page}} / {{totalPages}}</p>
+    <div style="display:flex; gap:8px;">
+      {{#if hasPrevPage}}
+        <a href="{{prevLink}}">← Anterior</a>
+      {{/if}}
+      {{#if hasNextPage}}
+        <a href="{{nextLink}}">Siguiente →</a>
+      {{/if}}
+    </div>
+  </footer>
+</section>
+
+<style>
+  .card{border:1px solid #e5e7eb;border-radius:10px}
+  .img{width:100%;height:180px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb}
+</style>
+
+<script>
+  document.getElementById('filterForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const params = new URLSearchParams(new FormData(e.target)).toString();
+    window.location.href = `/products?${params}`;
+  });
+
+  async function ensureCart() {
+    let cid = localStorage.getItem('cid');
+    if (!cid) {
+      const r = await fetch('/api/carts', { method: 'POST' });
+      if (!r.ok) throw new Error('No se pudo crear el carrito');
+      const j = await r.json();
+      cid = j?.payload?._id || j?.payload?.id;
+      if (!cid) throw new Error('Respuesta sin cid');
+      localStorage.setItem('cid', cid);
+    }
+    return cid;
+  }
+
+  document.querySelectorAll('.btn-cart').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        const pid = btn.dataset.id;
+        const cid = await ensureCart();
+        const r = await fetch(`/api/carts/${cid}/product/${pid}`, { method: 'POST' });
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          throw new Error(j?.error || 'No se pudo agregar');
+        }
+        alert('Producto agregado al carrito ✔️');
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    });
+  });
+</script>

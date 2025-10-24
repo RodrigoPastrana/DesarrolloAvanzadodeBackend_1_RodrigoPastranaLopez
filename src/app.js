@@ -1,10 +1,12 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import exphbs from 'express-handlebars';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import exphbs from 'express-handlebars';
 
+import { connectDB } from './config/db.js';
 import productsRouter from './routes/products.router.js';
 import cartsRouter from './routes/carts.router.js';
 import viewsRouter from './routes/views.router.js';
@@ -17,44 +19,44 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
 
-// para emitir también desde HTTP (POST/PUT/DELETE)
+
 app.set('io', io);
 
-app.use(express.json());
 
-// Handlebars
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+
+app.use('/static', express.static(path.join(__dirname, 'public')));
+
+
 app.engine('handlebars', exphbs.engine({
   defaultLayout: 'main',
   layoutsDir: path.join(__dirname, 'views', 'layouts'),
   partialsDir: path.join(__dirname, 'views', 'partials'),
+  helpers: {
+    eq: (a, b) => String(a) === String(b),
+  },
 }));
 app.set('view engine', 'handlebars');
 app.set('views', path.join(__dirname, 'views'));
 
-// Vistas
+
 app.use('/', viewsRouter);
 
-// APIs
+
 app.use('/api/products', productsRouter);
 app.use('/api/carts', cartsRouter);
 
-// Health
+
 app.get('/health', (req, res) => res.json({ ok: true }));
 
-// --- Socket.IO (sin logs ruidosos) ---
+
 io.on('connection', async (socket) => {
-  // console.log('Cliente conectado:', socket.id);
+  
   socket.emit('productsUpdated', await ProductManager.getAll());
 
-  socket.on('createProduct', async (payload) => {
-    try {
-      await ProductManager.create(payload);
-      io.emit('productsUpdated', await ProductManager.getAll());
-    } catch (err) {
-      socket.emit('errorMessage', err.message || 'Error al crear producto');
-    }
-  });
-
+ 
   socket.on('deleteProduct', async (id) => {
     try {
       await ProductManager.delete(id);
@@ -63,16 +65,42 @@ io.on('connection', async (socket) => {
       socket.emit('errorMessage', err.message || 'Error al eliminar producto');
     }
   });
+
+  socket.on('setStock', async ({ id, stock }) => {
+    try {
+      const s = Number(stock);
+      if (Number.isNaN(s) || s < 0) throw new Error('Stock inválido');
+      await ProductManager.update(id, { stock: s });
+      io.emit('productsUpdated', await ProductManager.getAll());
+    } catch (err) {
+      socket.emit('errorMessage', err.message || 'Error al actualizar stock');
+    }
+  });
 });
 
-// Errores
+// Manejo de errores
 app.use((err, req, res, next) => {
-  // log mínimo de errores
-  console.error(err.message || err);
-  res.status(err.status || 500).json({ error: err.message || 'Error interno' });
+  console.error(err);
+
+  if (err.name === 'CastError') {
+    return res.status(400).json({ error: `Identificador inválido en el campo "${err.path}"` });
+  }
+  if (err.name === 'ValidationError') {
+    const details = Object.values(err.errors).map(e => e.message);
+    return res.status(400).json({ error: 'Validación fallida', details });
+  }
+  if (err.code === 11000) {
+    return res.status(409).json({ error: 'El código ya existe', key: err.keyValue });
+  }
+
+  const status = err.status || 500;
+  res.status(status).json({ error: err.message || 'Error interno' });
 });
 
-const PORT = 8080; // o 4040 si lo venías usando
-httpServer.listen(PORT, () => {
-  console.log(`Servidor iniciado: http://localhost:${PORT}`);
+
+const PORT = process.env.PORT || 8080;
+connectDB().then(() => {
+  httpServer.listen(PORT, () => {
+    console.log(`Servidor iniciado: http://localhost:${PORT}`);
+  });
 });

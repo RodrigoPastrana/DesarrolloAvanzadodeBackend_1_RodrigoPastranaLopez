@@ -1,0 +1,166 @@
+<section>
+  
+  <span id="cidText" style="display:none">{{cid}}</span>
+
+  {{#if products.length}}
+  <div class="grid" id="cartGrid">
+    {{#each products}}
+    <div class="card" data-pid="{{this.product._id}}" data-price="{{this.product.price}}">
+      <h3 style="margin:0 0 6px 0;">{{this.product.title}}</h3>
+      <div class="muted">{{this.product.description}}</div>
+      <div style="margin-top:6px;"><strong>Precio:</strong> ${{this.product.price}}</div>
+      <div><strong>Categoría:</strong> {{this.product.category}}</div>
+      <div><strong>Subtotal:</strong> $<span class="subVal">0</span></div>
+
+      <div class="controls">
+        <strong>Cantidad:</strong>
+        <button class="btn btn-danger qty-btn" data-action="dec">-</button>
+        <input class="qty-input" type="number" min="1" value="{{this.quantity}}">
+        <button class="btn btn-success qty-btn" data-action="inc">+</button>
+        <button class="btn btn-primary qty-btn" data-action="set">Actualizar</button>
+      </div>
+
+      <div style="margin-top:10px;">
+        <button class="btn btn-danger btn-outline remove-btn">Eliminar del carrito</button>
+      </div>
+    </div>
+    {{/each}}
+  </div>
+
+  <div id="cartSummary" style="margin-top:16px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; background:#fafafa;">
+    <strong>Total:</strong>
+    $<span id="totalValue">0</span>
+  </div>
+
+  <div style="margin-top:16px; display:flex; gap:10px; align-items:center;">
+    <a href="/products" class="btn btn-link">← Seguir comprando</a>
+    <button id="clearCart" class="btn btn-danger btn-outline">Vaciar carrito</button>
+  </div>
+  {{else}}
+  <p>No hay productos en este carrito.</p>
+  <a href="/products">Ir a productos →</a>
+  {{/if}}
+</section>
+
+<style>
+  #toast{position:fixed;right:16px;bottom:16px;padding:10px 14px;border-radius:10px;color:#fff;background:#111827;opacity:0;transform:translateY(12px);transition:all .25s ease;pointer-events:none;z-index:9999;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+  #toast.show{opacity:1;transform:translateY(0)}
+  #toast.success{background:#16a34a}
+  #toast.error{background:#dc2626}
+  #toast.info{background:#2563eb}
+  .card{display:flex;flex-direction:column;justify-content:space-between}
+  .card .controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
+  .qty-input{padding:6px 8px;width:60px;text-align:center;border-radius:6px;border:1px solid #d1d5db}
+  #totalValue{font-variant-numeric:tabular-nums}
+</style>
+<div id="toast"></div>
+
+<script>
+  const toastEl = document.getElementById('toast');
+  let tmr;
+  function toast(msg, type = 'info', ms = 1600) {
+    toastEl.textContent = msg;
+    toastEl.className = '';
+    toastEl.classList.add(type, 'show');
+    clearTimeout(tmr);
+    tmr = setTimeout(() => toastEl.classList.remove('show'), ms);
+  }
+
+  let CID = document.getElementById('cidText')?.textContent?.trim();
+  if (!CID) {
+    const ls = localStorage.getItem('cid');
+    if (ls) { CID = ls; const cidEl = document.getElementById('cidText'); if (cidEl) cidEl.textContent = ls; }
+  }
+
+  const grid = document.getElementById('cartGrid');
+
+  const totalEl = document.getElementById('totalValue');
+  function currency(n) { return (n || 0).toLocaleString('es-AR'); }
+  function recalcTotal() {
+    if (!totalEl) return;
+    let total = 0;
+    document.querySelectorAll('#cartGrid .card').forEach(card => {
+      const price = parseFloat(card.dataset.price) || 0;
+      const qty = parseInt(card.querySelector('.qty-input')?.value || '1', 10);
+      const sub = price * qty;
+      const subEl = card.querySelector('.subVal');
+      if (subEl) subEl.textContent = currency(sub);
+      total += sub;
+    });
+    totalEl.textContent = currency(total);
+  }
+
+  recalcTotal();
+
+  if (grid) {
+    grid.addEventListener('click', async (e) => {
+      const card = e.target.closest('.card');
+      if (!card) return;
+      const pid = card.dataset.pid;
+      const input = card.querySelector('.qty-input');
+
+      if (e.target.classList.contains('qty-btn')) {
+        const action = e.target.dataset.action;
+
+        if (action === 'inc') {
+          input.value = String(Math.max(1, Number(input.value || 1) + 1));
+          recalcTotal();
+          return;
+        }
+        if (action === 'dec') {
+          input.value = String(Math.max(1, Number(input.value || 1) - 1));
+          recalcTotal();
+          return;
+        }
+        if (action === 'set') {
+          const qty = Number(input.value);
+          if (!Number.isFinite(qty) || qty < 1) { toast('Cantidad inválida', 'error'); return; }
+          const r = await fetch(`/api/carts/${CID}/products/${pid}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ quantity: qty })
+          });
+          if (r.ok) {
+            toast('Cantidad actualizada', 'success');
+            recalcTotal();
+          } else {
+            const j = await r.json().catch(() => ({}));
+            toast(j?.error || 'No se pudo actualizar', 'error', 2200);
+          }
+        }
+      }
+
+      if (e.target.classList.contains('remove-btn')) {
+        const ok = confirm('¿Eliminar este producto del carrito?');
+        if (!ok) return;
+        const r = await fetch(`/api/carts/${CID}/products/${pid}`, { method: 'DELETE' });
+        if (r.ok) {
+          toast('Eliminado del carrito', 'success');
+          card.remove();
+          recalcTotal();
+          if (!grid.querySelector('.card')) location.reload();
+        } else {
+          const j = await r.json().catch(() => ({}));
+          toast(j?.error || 'No se pudo eliminar', 'error', 2200);
+        }
+      }
+    });
+
+    grid.addEventListener('input', (e) => {
+      if (e.target.classList.contains('qty-input')) recalcTotal();
+    });
+  }
+
+  document.getElementById('clearCart')?.addEventListener('click', async () => {
+    const ok = confirm('¿Vaciar todo el carrito?');
+    if (!ok) return;
+    const r = await fetch(`/api/carts/${CID}`, { method: 'DELETE' });
+    if (r.ok) {
+      toast('Carrito vaciado', 'success');
+      location.reload();
+    } else {
+      const j = await r.json().catch(() => ({}));
+      toast(j?.error || 'No se pudo vaciar', 'error', 2200);
+    }
+  });
+</script>

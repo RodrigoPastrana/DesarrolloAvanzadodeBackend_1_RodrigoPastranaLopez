@@ -1,93 +1,65 @@
-import { readJSON, writeJSON } from '../utils/file.js';
-
-const FILE = 'products.json';
+import Product from '../models/Product.model.js';
 
 export default class ProductManager {
+  
   static async getAll() {
-    return readJSON(FILE);
+    return Product.find().lean();
   }
 
   static async getById(id) {
-    const all = await this.getAll();
-    return all.find(p => String(p.id) === String(id)) || null;
+    return Product.findById(id).lean();
   }
 
   static async create(data) {
-    const all = await this.getAll();
-
-    const required = ['title','description','code','price','status','stock','category'];
-    for (const f of required) {
-      if (data[f] === undefined) {
-        const e = new Error(`Campo requerido faltante: ${f}`);
-        e.status = 400;
-        throw e;
-      }
-    }
-
-    if (all.some(p => p.code === data.code)) {
-      const e = new Error(`El code "${data.code}" ya existe`);
-      e.status = 409;
-      throw e;
-    }
-
-    const nextId = all.length ? (Math.max(...all.map(p => Number(p.id) || 0)) + 1) : 1;
-
-    const product = {
-      id: nextId,
-      title: String(data.title),
-      description: String(data.description),
-      code: String(data.code),
-      price: Number(data.price),
-      status: Boolean(data.status),
-      stock: Number(data.stock),
-      category: String(data.category),
-      thumbnails: Array.isArray(data.thumbnails) ? data.thumbnails.map(String) : []
-    };
-
-    all.push(product);
-    await writeJSON(FILE, all);
-    return product;
+    const doc = await Product.create(data);
+    return doc.toObject ? doc.toObject() : doc;
   }
 
   static async update(id, updates) {
-    if ('id' in updates) {
-      const e = new Error('No se permite actualizar el id');
-      e.status = 400;
-      throw e;
-    }
-    const all = await this.getAll();
-    const idx = all.findIndex(p => String(p.id) === String(id));
-    if (idx === -1) {
-      const e = new Error('Producto no encontrado');
-      e.status = 404;
-      throw e;
-    }
-
-    if ('code' in updates) {
-      const dup = all.find(p => p.code === updates.code && String(p.id) !== String(id));
-      if (dup) {
-        const e = new Error(`El code "${updates.code}" ya está en uso`);
-        e.status = 409;
-        throw e;
-      }
-    }
-
-    const updated = { ...all[idx], ...updates };
-    all[idx] = updated;
-    await writeJSON(FILE, all);
-    return updated;
+   
+    delete updates._id;
+    return Product.findByIdAndUpdate(id, updates, {
+      new: true, runValidators: true, lean: true
+    });
   }
 
   static async delete(id) {
-    const all = await this.getAll();
-    const idx = all.findIndex(p => String(p.id) === String(id));
-    if (idx === -1) {
-      const e = new Error('Producto no encontrado');
-      e.status = 404;
-      throw e;
-    }
-    const [removed] = all.splice(idx, 1);
-    await writeJSON(FILE, all);
-    return removed;
+    return Product.findByIdAndDelete(id).lean();
   }
+
+
+  static async getAllPaginated({ limit = 10, page = 1, sort, query }) {
+    const filter = {};
+    const q = (query ?? '').trim();
+
+    if (q) {
+      if (q.includes(':')) {
+        
+        const [key, raw] = q.split(':');
+        if (key === 'category' && raw) {
+          filter.category = new RegExp(`^${raw}$`, 'i'); 
+        }
+        if (key === 'status' && raw !== undefined) {
+          filter.status = (raw === 'true');
+        }
+      } else {
+        
+        filter.category = new RegExp(`^${q}$`, 'i');
+      }
+    }
+
+    const sortOpt = {};
+    if (sort === 'asc') sortOpt.price = 1;
+    if (sort === 'desc') sortOpt.price = -1;
+
+    const result = await Product.paginate(filter, {
+      limit: Number(limit) || 10,
+      page: Number(page) || 1,
+      sort: Object.keys(sortOpt).length ? sortOpt : undefined,
+      lean: true
+    });
+
+    return result;
+  }
+
 }

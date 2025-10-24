@@ -1,0 +1,51 @@
+<section>
+  <a href="/products">← Volver</a>
+  <header style="margin:10px 0 14px;">
+    <h2 style="margin:0;">{{product.title}}</h2>
+    <div class="muted">{{product.category}}</div>
+  </header>
+
+  <div class="card">
+    <p>{{product.description}}</p>
+    <p><strong>Precio:</strong> ${{product.price}}</p>
+    <p><strong>Stock:</strong> {{product.stock}}</p>
+    {{#if product.thumbnails.length}}
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        {{#each product.thumbnails}}
+          <img src="{{this}}" alt="thumb" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;" />
+        {{/each}}
+      </div>
+    {{/if}}
+    <div style="margin-top:12px;">
+      <button id="addToCartBtn" data-id="{{product._id}}">Agregar al carrito</button>
+    </div>
+  </div>
+</section>
+
+<script>
+  async function ensureCart() {
+    let cid = localStorage.getItem('cid');
+    if (!cid) {
+      const r = await fetch('/api/carts', { method: 'POST' });
+      const j = await r.json();
+      cid = j?.payload?._id || j?.payload?.id;
+      localStorage.setItem('cid', cid);
+    }
+    return cid;
+  }
+
+  document.getElementById('addToCartBtn')?.addEventListener('click', async (e) => {
+    try {
+      const pid = e.currentTarget.dataset.id;
+      const cid = await ensureCart();
+      const r = await fetch(`/api/carts/${cid}/product/${pid}`, { method: 'POST' });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j?.error || 'No se pudo agregar');
+      }
+      alert('Producto agregado al carrito ✔️');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  });
+</script>
